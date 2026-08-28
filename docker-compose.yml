@@ -27,8 +27,14 @@ services:
       # or DELETE on audit_log. That separation is the point of migration 002.
       DATABASE_URL: postgresql://bpm_app:demo_app_password_not_a_real_secret@db:5432/bpm_demo
       PORT: "8140"
+      # Uploaded files live on a volume, not in the image layer, so they survive
+      # a rebuild. Outside the web root either way — nothing serves this path.
+      STORAGE_ROOT: /data/documents
+    volumes:
+      - bpm_documents:/data/documents
     ports:
       - "8140:8140"
 
 volumes:
   bpm_pgdata:
+  bpm_documents:
