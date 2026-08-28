@@ -14,6 +14,7 @@ import { About } from './pages/About'
 import { Projects } from './pages/Projects'
 import { ProjectDetail } from './pages/ProjectDetail'
 import { Rfqs } from './pages/Rfqs'
+import { Suppliers } from './pages/Suppliers'
 import { RfqCompare } from './pages/RfqCompare'
 import { PoDetailPage, PurchaseOrders } from './pages/PurchaseOrders'
 import { Audit } from './pages/Audit'
@@ -85,6 +86,7 @@ function Gate() {
 const NAV = [
   { to: '/', label: 'About this demo', perm: null, end: true },
   { to: '/projects', label: 'Projects', perm: 'project.read' },
+  { to: '/suppliers', label: 'Suppliers', perm: 'supplier.read' },
   { to: '/rfqs', label: 'RFQs & quotations', perm: 'rfq.read' },
   { to: '/purchase-orders', label: 'Purchase orders', perm: 'po.read' },
   { to: '/audit', label: 'Activity log', perm: 'audit.read' },
@@ -95,6 +97,7 @@ const TITLES: Array<[RegExp, string]> = [
   [/^\/$/, 'About this demo'],
   [/^\/projects$/, 'Projects'],
   [/^\/projects\//, 'Project'],
+  [/^\/suppliers$/, 'Suppliers'],
   [/^\/rfqs$/, 'RFQs & quotations'],
   [/^\/rfqs\//, 'Quotation comparison'],
   [/^\/purchase-orders$/, 'Purchase orders'],
@@ -156,6 +159,9 @@ function Shell({ me, onSignedOut }: { me: Me; onSignedOut: () => void | Promise<
                 <Route path="/projects" element={<Projects perms={perms} />} />
                 <Route path="/projects/:id" element={<ProjectDetail perms={perms} />} />
               </>
+            )}
+            {perms.has('supplier.read') && (
+              <Route path="/suppliers" element={<Suppliers perms={perms} />} />
             )}
             {perms.has('rfq.read') && (
               <>

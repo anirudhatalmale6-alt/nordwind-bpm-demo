@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { api, useApi, type RfqCompare as RC } from '../api'
 import { Loading, Money, StatusPill } from '../components/bits'
 import { RawPanel } from '../components/Raw'
+import { Documents } from '../components/Documents'
 
 export function RfqCompare({ perms }: { perms: Set<string> }) {
   const { id } = useParams()
@@ -278,6 +279,8 @@ export function RfqCompare({ perms }: { perms: Set<string> }) {
           </div>
         </div>
       )}
+
+      <Documents entityType="rfq" entityId={d.rfq.id} perms={perms} title="RFQ documents" />
 
       <RawPanel raw={q.data?.raw} redacted={d._redacted} />
     </>

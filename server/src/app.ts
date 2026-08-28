@@ -1,16 +1,19 @@
 import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
 import fastifyStatic from '@fastify/static'
+import multipart from '@fastify/multipart'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertEveryRouteIsGuarded, loadAuth, SESSION_COOKIE } from './core/auth.ts'
 import type { Db } from './db/db.ts'
+import { MAX_UPLOAD_BYTES } from './core/storage.ts'
 import { authRoutes } from './modules/auth.routes.ts'
 import { projectRoutes } from './modules/projects.routes.ts'
 import { procurementRoutes } from './modules/procurement.routes.ts'
 import { auditRoutes } from './modules/audit.routes.ts'
 import { metaRoutes } from './modules/meta.routes.ts'
+import { documentRoutes } from './modules/documents.routes.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -27,6 +30,11 @@ export function buildApp(db: Db) {
   assertEveryRouteIsGuarded(app)
 
   app.register(cookie)
+  app.register(multipart, {
+    // Streamed to disk, never buffered in memory, so this is a cap on what
+    // lands on the volume rather than on what the process can be made to hold.
+    limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 6 },
+  })
 
   app.decorateRequest('auth', null)
 
@@ -49,6 +57,7 @@ export function buildApp(db: Db) {
   projectRoutes(app, db)
   procurementRoutes(app, db)
   auditRoutes(app, db)
+  documentRoutes(app, db)
 
   // Serve the built React app. Single origin, so there is no CORS to configure
   // and the session cookie is same-site by construction.

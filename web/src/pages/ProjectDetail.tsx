@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useApi, type ProjectDetail as PD } from '../api'
 import { Loading, LockedStat, Money, Stat, StatusPill } from '../components/bits'
 import { RawPanel } from '../components/Raw'
+import { Documents } from '../components/Documents'
 
 export function ProjectDetail({ perms }: { perms: Set<string> }) {
   const { id } = useParams()
@@ -202,6 +203,8 @@ export function ProjectDetail({ perms }: { perms: Set<string> }) {
           </div>
         )}
       </div>
+
+      <Documents entityType="project" entityId={p.id} perms={perms} />
 
       <RawPanel raw={q.data?.raw} redacted={p._redacted} />
     </>

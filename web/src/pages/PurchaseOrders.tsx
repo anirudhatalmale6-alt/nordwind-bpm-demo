@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { api, useApi, type PoDetail, type PoRow } from '../api'
 import { Loading, Money, StatusPill } from '../components/bits'
 import { RawPanel } from '../components/Raw'
+import { Documents } from '../components/Documents'
 
 export function PurchaseOrders({ perms }: { perms: Set<string> }) {
   const q = useApi<{ purchase_orders: PoRow[]; _redacted?: { fields: string[]; note: string } }>(
@@ -202,6 +203,13 @@ export function PoDetailPage({ perms }: { perms: Set<string> }) {
           </table>
         </div>
       </div>
+
+      <Documents
+        entityType="purchase_order"
+        entityId={po.id}
+        perms={perms}
+        title="Order documents"
+      />
 
       <RawPanel raw={q.data?.raw} redacted={po._redacted} />
     </>

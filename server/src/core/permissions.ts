@@ -35,6 +35,9 @@ export const PERMISSIONS = {
   'shipment.read': 'View shipments',
   'shipment.write': 'Record shipments and deliveries',
 
+  'document.upload': 'Attach documents to records',
+  'document.delete': 'Remove attached documents',
+
   'audit.read': 'View the activity log',
   'admin.users': 'Manage users, roles and permissions',
 } as const
@@ -72,6 +75,7 @@ export const ROLE_BUNDLES: Record<string, { name: string; description: string; p
       'po.read',
       'po.create',
       'shipment.read',
+      'document.upload',
       'audit.read',
     ],
   },
@@ -80,7 +84,16 @@ export const ROLE_BUNDLES: Record<string, { name: string; description: string; p
     name: 'Logistics',
     description:
       'Tracks shipments and deliveries against approved POs. Sees quantities and dates, but no prices at all.',
-    perms: ['project.read', 'po.read', 'shipment.read', 'shipment.write', 'supplier.read'],
+    perms: [
+      'project.read',
+      'po.read',
+      'shipment.read',
+      'shipment.write',
+      'supplier.read',
+      // Logistics uploads delivery notes and packing lists, so it can attach
+      // documents — but not remove them.
+      'document.upload',
+    ],
   },
 }
 

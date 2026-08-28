@@ -49,7 +49,7 @@ run takes a few minutes (npm install); after that it is a few seconds.
 
 | Email | Role | Sees |
 |---|---|---|
-| `anna.meyer@nordwind-demo.com` | Management | cost, revenue, **and margin**; approves POs |
+| `anna.meyer@nordwind-demo.com` | Management | cost, revenue, **and margin**; approves POs; deletes documents |
 | `ravi.kumar@nordwind-demo.com` | Purchasing | purchase cost only — no sell price, so no margin |
 | `maria.santos@nordwind-demo.com` | Logistics | quantities and dates, **no prices at all** |
 
@@ -157,7 +157,47 @@ unrepresentable — along with partial deliveries and shipments that carry lines
 from three different orders. It is the most expensive modelling mistake in a
 procurement system, because you cannot unwind it once real data is in there.
 
-### 7. Roles and permissions
+### 7. Documents
+
+Attachments hang off suppliers, projects, RFQs and purchase orders.
+
+![Supplier documents](docs/screenshots/09-suppliers-documents.png)
+
+Four things worth knowing about how they are handled:
+
+**Files never sit in the web root** and nothing serves them directly. They live
+under `.storage/YYYY/MM/<uuid>.<ext>` with a random name that says nothing about
+the contents, and downloads go through
+[`documents.routes.ts`](server/src/modules/documents.routes.ts), which checks
+permission on the owning record and only then streams the bytes. A URL that
+leaks out of somebody's inbox is worth nothing to whoever finds it.
+
+**Access is decided by the owning record**, not by a per-file ACL — you may read
+this document because you may read the purchase order it is attached to. Both
+halves are checked: the permission (may this role read POs at all) and the
+row-level scope (is this PO on a project they are assigned to). Try
+`GET /api/documents/2/download` as Maria and you get a 404, not a 403 — a 403
+would confirm the document exists.
+
+**The extension is checked against the file's actual first bytes.** Rename a
+text file to `.pdf` and the upload is rejected: an extension is a claim, magic
+bytes are evidence. Uploads stream to disk while hashing, so the 15 MB cap is a
+cap on the volume rather than on process memory, and a rejected upload leaves no
+half-written file behind.
+
+**Deletes are soft.** The row is marked and the blob is removed later by
+[`reap-documents.ts`](server/src/db/reap-documents.ts), run from cron with a
+grace period. Somebody deletes the wrong attachment on a Friday and wants it
+back on Monday — and unlinking a path straight out of the database, at the
+moment a request asks you to, is how a bad path takes something else with it.
+Every read of a path goes through `safeJoin`, which refuses anything resolving
+outside the storage root.
+
+Uploads, downloads, deletions **and denied attempts** are all written to the
+audit log. On a system holding supplier pricing, who read what is exactly the
+question that gets asked later.
+
+### 8. Roles and permissions
 
 ![Permission matrix](docs/screenshots/07-permission-matrix.png)
 
@@ -210,6 +250,10 @@ sync on startup and had four workers race each other to create the same tables.
 a guard and the server refuses to start. I would rather fail a deploy than leak
 a margin.
 
+**File storage is swappable.** Everything the application sees is an opaque
+storage path; moving to S3 or MinIO is a change to
+[`core/storage.ts`](server/src/core/storage.ts) and nothing else.
+
 **Sessions are server-side and stored hashed.** Revocation is immediate, which a
 stateless JWT cannot do before it expires, and a database dump yields no usable
 tokens. Cookie is `httpOnly`, `SameSite=Strict`.
@@ -218,8 +262,8 @@ tokens. Cookie is `httpOnly`, `SameSite=Strict`.
 
 ## Not in this slice
 
-Shipments and goods receipt, document storage, tasks and notifications, the
-customer quotation editor, and the admin screens for editing roles. Those are
+Shipments and goods receipt, tasks and notifications, the customer quotation
+editor, and the admin screens for editing roles. Those are
 later milestones. This slice covers the decisions that are hardest to reverse
 once real data exists: the permission model, the line-level document links, and
 the money.

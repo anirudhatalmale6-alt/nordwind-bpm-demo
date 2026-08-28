@@ -236,6 +236,24 @@ export interface AuditLogTable {
   context: ColumnType<unknown, string | null, string | null> | null
 }
 
+export interface DocumentsTable {
+  id: Generated<number>
+  entity_type: string
+  entity_id: number
+  original_filename: string
+  stored_name: string
+  storage_path: string
+  mime_type: string
+  byte_size: ColumnType<string, string | number, string | number>
+  sha256: string
+  description: Generated<string>
+  uploaded_by: number
+  uploaded_at: Generated<Ts>
+  deleted_at: Ts | null
+  deleted_by: number | null
+  blob_removed_at: Ts | null
+}
+
 export interface VProjectTotals {
   project_id: number
   cost_base: Numeric
@@ -264,5 +282,6 @@ export interface DB {
   po_lines: PoLinesTable
   project_ledger: ProjectLedgerTable
   audit_log: AuditLogTable
+  documents: DocumentsTable
   v_project_totals: VProjectTotals
 }

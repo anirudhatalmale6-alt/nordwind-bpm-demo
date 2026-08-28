@@ -11,6 +11,10 @@ import type { DB } from './types.ts'
 import { hashPassword } from '../core/password.ts'
 import { ROLE_BUNDLES, PERMISSIONS, type PermissionKey } from '../core/permissions.ts'
 import * as D from '../core/dec.ts'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, writeFile, rm } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { STORAGE_ROOT } from '../core/storage.ts'
 
 const adminUrl = process.env.ADMIN_DATABASE_URL ?? 'postgresql://bpm@127.0.0.1:5439/bpm_demo'
 pg.types.setTypeParser(1700, (v) => v)
@@ -21,6 +25,7 @@ const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) })
 
 // Wipe in dependency order so the seed is re-runnable.
 for (const t of [
+  'documents',
   'audit_log',
   'project_ledger',
   'po_lines',
@@ -514,6 +519,74 @@ await db
     { at: new Date('2026-08-22T09:14:31Z'), actor_user_id: anna, actor_ip: '10.20.4.8', request_id: 'seed', entity_type: 'project_ledger', entity_id: String(wrongId), action: 'ledger.reverse', summary: 'Reversed port handling entry and posted corrected amount', diff: JSON.stringify({ amount_base: { from: '2400.00', to: '1870.00' } }), context: JSON.stringify({ reason: 'Supplier credit note CN-8841' }) },
   ])
   .execute()
+
+// ----- documents -------------------------------------------------------------
+// A few real (if minimal) PDFs so a fresh install has something to open, and so
+// the download path is exercised the moment you sign in rather than only after
+// you upload something yourself.
+
+await rm(STORAGE_ROOT, { recursive: true, force: true })
+
+/** A valid, minimal single-page PDF with one line of text on it. */
+function tinyPdf(text: string): Buffer {
+  const content = `BT /F1 11 Tf 40 120 Td (${text.replace(/[()\\]/g, '')}) Tj ET`
+  const objects = [
+    '<</Type/Catalog/Pages 2 0 R>>',
+    '<</Type/Pages/Kids[3 0 R]/Count 1>>',
+    '<</Type/Page/Parent 2 0 R/MediaBox[0 0 420 160]/Resources<</Font<</F1 5 0 R>>>>/Contents 4 0 R>>',
+    `<</Length ${content.length}>>\nstream\n${content}\nendstream`,
+    '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>',
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets: number[] = []
+  objects.forEach((body, i) => {
+    offsets.push(pdf.length)
+    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`
+  })
+  const xref = pdf.length
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (const off of offsets) pdf += `${String(off).padStart(10, '0')} 00000 n \n`
+  pdf += `trailer<</Size ${objects.length + 1}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`
+  return Buffer.from(pdf, 'latin1')
+}
+
+async function attach(
+  entityType: string,
+  entityId: number,
+  filename: string,
+  description: string,
+  uploadedBy: number,
+  bodyText: string,
+) {
+  const body = tinyPdf(bodyText)
+  const stored = `${randomUUID()}.pdf`
+  const rel = join('2026', '07', stored)
+  const abs = join(STORAGE_ROOT, rel)
+  await mkdir(dirname(abs), { recursive: true })
+  await writeFile(abs, body)
+  await db
+    .insertInto('documents')
+    .values({
+      entity_type: entityType,
+      entity_id: entityId,
+      original_filename: filename,
+      stored_name: stored,
+      storage_path: rel.split(/[\\/]/).join('/'),
+      mime_type: 'application/pdf',
+      byte_size: body.length,
+      sha256: createHash('sha256').update(body).digest('hex'),
+      description,
+      uploaded_by: uploadedBy,
+    })
+    .execute()
+}
+
+await attach('supplier', sup('S-2001'), 'hanseatic-iso9001-certificate.pdf', 'ISO 9001 certificate, valid to 2028', ravi, 'Hanseatic Pumpentechnik GmbH - ISO 9001:2015 certificate (demo document)')
+await attach('supplier', sup('S-2003'), 'ningbo-supplier-questionnaire.pdf', 'Supplier questionnaire, returned 2026-06', ravi, 'Ningbo Fluid Control Co. Ltd - supplier questionnaire (demo document)')
+await attach('rfq', rfq.id, 'RFQ-2026-0087-technical-spec.pdf', 'Technical specification issued with the RFQ', ravi, 'RFQ-2026-0087 - technical specification, MS Nordlys pump refit (demo document)')
+await attach('rfq', rfq.id, 'SQ-2026-0209-as-received.pdf', 'Ningbo quotation exactly as received by email', ravi, 'SQ-2026-0209 - supplier quotation as received (demo document)')
+await attach('purchase_order', po1.id, 'PO-2026-0308-signed.pdf', 'Countersigned order confirmation', anna, 'PO-2026-0308 - countersigned order confirmation (demo document)')
+await attach('project', prj('P-2026-014'), 'BFL-REFIT-2026-014-contract.pdf', 'Customer contract, redacted copy', anna, 'Baltic Ferry Lines AS - contract BFL/REFIT/2026-014 (demo document)')
 
 console.log('seed complete')
 console.log('  users: anna.meyer@nordwind-demo.com / ravi.kumar@nordwind-demo.com / maria.santos@nordwind-demo.com')
