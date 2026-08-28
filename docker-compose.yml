@@ -1,0 +1,34 @@
+# docker compose up
+# then open http://localhost:8140
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bpm
+      POSTGRES_PASSWORD: bpm_demo_password
+      POSTGRES_DB: bpm_demo
+    volumes:
+      - bpm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bpm -d bpm_demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Migrations and seeding run as the schema owner...
+      ADMIN_DATABASE_URL: postgresql://bpm:bpm_demo_password@db:5432/bpm_demo
+      # ...but the application itself connects as bpm_app, which has no UPDATE
+      # or DELETE on audit_log. That separation is the point of migration 002.
+      DATABASE_URL: postgresql://bpm_app:demo_app_password_not_a_real_secret@db:5432/bpm_demo
+      PORT: "8140"
+    ports:
+      - "8140:8140"
+
+volumes:
+  bpm_pgdata:
